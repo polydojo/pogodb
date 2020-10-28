@@ -25,6 +25,7 @@ import psycopg2;
 import psycopg2.extras;
 import dotsi;
 
+__version__ = "0.0.1";  # Req'd by flit.
 mapli = lambda seq, fn: dotsi.List(map(fn, seq));
 
 # Good to know:

@@ -1,0 +1,13 @@
+[build-system]
+requires = ["flit_core >=2,<4"]
+build-backend = "flit_core.buildapi"
+
+[tool.flit.metadata]
+module = "pogodb"
+author = "Polydojo, Inc."
+author-email = "8079593+sumukhbarve@users.noreply.github.com"
+home-page = "https://github.com/polydojo/pogodb"
+classifiers = ["License :: OSI Approved :: Apache Software License"]
+description-file = "README.md"
+requires = ["dotsi >=0.0.1"]
+

@@ -5,13 +5,11 @@ Simple NoSQL wrapper for Postgres' JSONB type.
 
 Installation
 --------------
-As of writing, here's the installation procedure:
-1. `pip install dotsi`
-2. `pip install psycopg2-binary` (or `pip install psycopg2`)
-3. Download `pogodb.py` to your project directory.
+PogoDB is installable via pip, following a two-step process:
+1. `pip install pogodb`
+2. `pip install psycopg2` ***OR*** `pip install psycopg2-binary`
 
-We'll work toward delivering a smoother installation experience. In the mean time, please follow the steps above.
-
+Since the `psycopg2`/`psycopg2-binary` split, instead of us forcing a dependency on either one, it makes more sense for you to install your preferred package. PogoDB should work with either. *Tip:*  If `pip install psycopg2` fails, try `pip install psycopg2-binary`.
 
 Quick Start:
 ---------------
