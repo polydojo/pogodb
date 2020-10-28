@@ -11,8 +11,8 @@ PogoDB is installable via pip, following a two-step process:
 
 Since the `psycopg2`/`psycopg2-binary` split, instead of us forcing a dependency on either one, it makes more sense for you to install your preferred package. PogoDB should work with either. *Tip:*  If `pip install psycopg2` fails, try `pip install psycopg2-binary`.
 
-Quick Start:
----------------
+Quick Start
+--------------
 To connect from a Python Shell, use `pogodb.shellConnect()`.
 ```py
 >>> import pogodb
@@ -27,8 +27,8 @@ Connection committed & closed. Call `.reopen()` to resume.
 ```
 *Note:* `pogodb.shellConnect(.)` is meant only for *quick and dirty* shell connections. You need to explicitly call `db.close()` to commit the transaction and close the connection.
 
-Connecting Properly:
---------------------------
+Connecting Properly
+-------------------------
 
 **Context Manager:**
 
@@ -54,8 +54,8 @@ def yourLogic (db):
 The decorator supplies the `db` parameter to the decorated function. The parameter is supplied by name, so it must be called `db`, not `myDb` or something else.
 
 
-Inserting Data:
---------------------------
+Inserting Data
+------------------
 ```py
 # Insert a single document:
 db.insertOne({
@@ -74,8 +74,8 @@ Each document must:
 - be a JSON-serializable `dict` or dict-like object, *and*
 - have a *unique string* value corresponding to the `"_id"` key.
 
-Retrieving Data:
---------------------
+Retrieving Data
+-------------------
 In continuation with the above code snippet ...
 ```py
 # Find by _id:
@@ -97,8 +97,8 @@ print(taskD.author, "-", taskD.text)
 ```
 *Note:* If no matching document is found, `.findOne(.)` returns `None` while `.find(.)` returns an empty list.
 
-Updating Data:
--------------------
+Updating Data
+------------------
 In continuation with the above code snippet ...
 ```py
 # Replace document:
@@ -119,8 +119,8 @@ print(db.findOne("a").x)
 # Output: {'y': 11, 'z': 19}
 ```
 
-Deleting Data:
-------------------
+Deleting Data
+-----------------
 In continuation with the above code snippet ...
 ```py
 # Delete by _id:
@@ -212,6 +212,10 @@ print(untyped_getPostById("00")) # Weird result.
 ```
 
 In the above example, `"00"` corresponds to Alice's `"user"` object. It's not a `"post"`. Yet `untyped_getPostById(.)` (incorrectly) returns it because it is type-blind.
+
+Quick Plug
+--------------
+PogoDB built and maintained by the folks at [Polydojo, Inc.](https://www.polydojo.com/) If your team is looking for a simple project management tool, please check out our latest product: [BoardBell.com](https://www.boardbell.com/).
 
 Licensing
 -----------

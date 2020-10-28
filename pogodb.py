@@ -21,11 +21,18 @@ import functools;
 import json;
 import contextlib;
 
-import psycopg2;
-import psycopg2.extras;
 import dotsi;
+try:
+    import psycopg2;
+except ImportError as e:
+    raise ImportError(
+        "No module named 'psycopg2'. Please install "
+        "psycopg2 OR psycopg2-binary to resolve this issue. "
+        "Installation via pip is recommended."
+    );
+import psycopg2.extras;
 
-__version__ = "0.0.1";  # Req'd by flit.
+__version__ = "0.0.2-preview";  # Req'd by flit.
 mapli = lambda seq, fn: dotsi.List(map(fn, seq));
 
 # Good to know:
