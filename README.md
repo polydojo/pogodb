@@ -11,7 +11,7 @@ PogoDB is installable via pip, following a two-step process:
 
 Since the `psycopg2`/`psycopg2-binary` split, instead of us forcing a dependency on either one, it makes more sense for you to install your preferred package. PogoDB should work with either. *Tip:*  If `pip install psycopg2` fails, try `pip install psycopg2-binary`.
 
-Quick Start
+Quickstart
 --------------
 To connect from a Python Shell, use `pogodb.shellConnect()`.
 ```py
@@ -93,7 +93,7 @@ aliceTasks = db.find({"author": "Alice"})
 assert aliceTasks[0] == taskA and len(aliceTasks) == 2
 taskD = aliceTasks[1];
 print(taskD.author, "-", taskD.text)
-# Output: Alice - AA
+# Output: Alice - DD
 ```
 *Note:* If no matching document is found, `.findOne(.)` returns `None` while `.find(.)` returns an empty list.
 
@@ -129,6 +129,10 @@ print(db.findOne("a"))
 # Output: None
 ```
 As of writing, you can only delete one document at a time, by `_id`.
+
+Quick Plug
+--------------
+PogoDB built and maintained by the folks at [Polydojo, Inc.](https://www.polydojo.com/), led by Sumukh Barve. If your team is looking for a simple project management tool, please check out our latest product: [BoardBell.com](https://www.boardbell.com/).
 
 Under The Hood
 ---------------------
@@ -213,12 +217,12 @@ print(untyped_getPostById("00")) # Weird result.
 
 In the above example, `"00"` corresponds to Alice's `"user"` object. It's not a `"post"`. Yet `untyped_getPostById(.)` (incorrectly) returns it because it is type-blind.
 
-Quick Plug
---------------
-PogoDB built and maintained by the folks at [Polydojo, Inc.](https://www.polydojo.com/) If your team is looking for a simple project management tool, please check out our latest product: [BoardBell.com](https://www.boardbell.com/).
-
 Licensing
------------
+------------
 Copyright (c) 2020 Polydojo, Inc.
 
+**Software Licensing:**  
 The software is released "AS IS" under the **Apache License 2.0**, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED. Kindly see [LICENSE.txt](https://github.com/polydojo/pogodb/blob/master/LICENSE.txt) for more details.
+
+**No Trademark Rights:**  
+The above software licensing terms **do not** grant any right in the trademarks, service marks, brand names or logos of Polydojo, Inc.
