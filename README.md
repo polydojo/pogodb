@@ -53,6 +53,9 @@ def yourLogic (db):
 ```
 The decorator supplies the `db` parameter to the decorated function. The parameter is supplied by name, so it must be called `db`, not `myDb` or something else.
 
+**Parameter `skipSetup`:**  
+Both `pogodb.connect` and `pogodb.makeConnector` accept `skipSetup` as a parameter, which defaults to `False`. Thus, by default, PogoDB runs some setup-code upon each connection. 
+_After_ your first interaction through PogoDB, to _avoid_ unnecessary setup, passing **`skipSetup=True`** is recommended.
 
 Inserting Data
 ------------------
@@ -138,7 +141,7 @@ Under The Hood
 ---------------------
 Under the hood, PogoDB creates a single table named `pogo_tbl` with a single `JSONB` column named `doc` (for document).
 
-**TODO:** Write documentation regarding lower-level functions such as `db.findSql(.)` and `db.execute(.)`.
+**TODO:** Write documentation regarding lower-level functions such as `db._findSql(.)` and `db._execute(.)`. Also document the `whereEtc` parameter accepted by `db.find(.)` and `db.findOne(.)`.
 
 Type Identifiers
 -------------------

@@ -32,7 +32,7 @@ except ImportError as e:
     );
 import psycopg2.extras;
 
-__version__ = "0.0.2-preview";  # Req'd by flit.
+__version__ = "0.0.2";  # Req'd by flit.
 mapli = lambda seq, fn: dotsi.List(map(fn, seq));
 
 # Good to know:
@@ -42,10 +42,13 @@ mapli = lambda seq, fn: dotsi.List(map(fn, seq));
 #
 
 
-def bindConCur (con, cur):
+def bindConCur (con, cur, skipSetup=False):
     db = dotsi.fy({"_con": con, "_cur": cur});  # Mainatain ref.
 
     def execute (stmt, args=None, fetch=None):
+        "Run SQL `stmt` by substituting `args`, then `fetch`.";
+        if fetch not in [None, "one", 1, "all"]:
+            raise ValueError("Unexpected `fetch` argument: %s" % (fetch,));
         cur.execute(stmt, args);
         if fetch in ["one", 1]:
             # cur.fetchone() -> psycopg2.extras.RealDictRow
@@ -53,10 +56,12 @@ def bindConCur (con, cur):
         if fetch == "all":
             # cur.fetchall -> list of psycopg2.extras.RealDictRow
             return mapli(cur.fetchall(), dotsi.Dict);
+        assert fetch is None;
         return None;
-    db.execute = execute;
+    db._execute = execute;
     
     def ensureTable ():
+        "Ensures that table 'pogotbl' is set up properly.";
         stmtList = [
             """
             CREATE TABLE IF NOT EXISTS pogotbl (
@@ -76,21 +81,29 @@ def bindConCur (con, cur):
     db.ensureTable = ensureTable;
     
     def showTables ():
+        "Utility. Shows non-default tables in the Postgres database.";
         stmt = "SELECT * FROM pg_catalog.pg_tables WHERE schemaname != 'pg_catalog' AND schemaname != 'information_schema';";
         pprint.pprint(execute(stmt, fetch="all"));
     db.showTables = showTables;
     
-    def dropTable ():
+    def dropTable (sure=False):
+        "Drops the 'pogotbl' table.";
+        if sure is not True:
+            raise ValueError("dropTable:: Are you sure? Pass `sure=True` if you really are.");
         stmt = "DROP TABLE IF EXISTS pogotbl;";
         execute(stmt);
     db.dropTable = dropTable;
     
-    def clearTable ():
-        dropTable();
+    def clearTable (sure=False):
+        "Clears the 'pogotbl' table.";
+        if sure is not True:
+            raise ValueError("clearTable:: Are you sure? Pass `sure=True` if you really are.");
+        dropTable(sure);
         ensureTable();
     db.clearTable = clearTable;
         
     def insertOne (doc):
+        "Inserts a single document, `doc`.";
         doc = dotsi.fy(doc);
         stmt = "INSERT INTO pogotbl (doc) VALUES (%s);";
         execute(stmt, [json.dumps(doc)]);
@@ -98,15 +111,17 @@ def bindConCur (con, cur):
     db.insertMany = lambda docList: mapli(docList, insertOne);
     
     def replaceOne (doc):
+        "Overwrites document `doc`, via `doc['_id'].";
         doc = dotsi.fy(doc);
         stmt = "UPDATE pogotbl SET doc = %s WHERE doc->>'_id' = %s";
         execute(stmt, [json.dumps(doc), doc._id]);
     db.replaceOne = replaceOne;
     db.replaceMany = lambda docList: mapli(docList, replaceOne);
     
-    def deleteOne (docId):
+    def deleteOne (_id):
+        "Deletes a single document by it's `_id`.";
         stmt = "DELETE FROM pogotbl WHERE doc->>'_id' = %s";
-        execute(stmt, [docId]);
+        execute(stmt, [_id]);
     db.deleteOne = deleteOne;
     
     def findSql (sql, args=None):
@@ -114,12 +129,14 @@ def bindConCur (con, cur):
             execute(sql, args, fetch="all"),
             lambda record: record["doc"],
         );
-    db.findSql = findSql;
+    db._findSql = findSql;
 
     def find (subdoc, whereEtc="", argsEtc=None, limit=None):
         # Checks:
-        assert isinstance(subdoc, dict) or type(subdoc) is str;
+        assert isinstance(subdoc, dict);
         assert type(whereEtc) is str;
+        if whereEtc.strip():
+            assert whereEtc.split()[0].upper() != "WHERE";
         assert argsEtc is None or type(argsEtc) is list;
         assert limit is None or (type(limit) is int and limit > 0);
         # Compose:
@@ -164,7 +181,10 @@ def bindConCur (con, cur):
         return incr(subdoc, keyPath, -delta);
     db.decr = decr;
     
-    def push (subdoc, arrPath, newEl):                      # arrPath: path to array. lastElPath: path to last element _in_ array. 
+    def push (subdoc, arrPath, newEl):
+        "Push `newEl` after `arrPath` in documents matching `subdoc`."; #TODO:Better docstring
+        # arrPath: path to array.
+        # lastElPath: path to last element _in_ array. 
         if type(subdoc) is str: subdoc = {"_id": subdoc};
         lastElPath = arrPath + ["-1"];
         stmt = "UPDATE pogotbl SET doc = jsonb_insert(doc, %s, %s, true) WHERE doc @> %s;";
@@ -172,30 +192,38 @@ def bindConCur (con, cur):
         execute(stmt, args);
     db.push = push;
     
-    # Return built `db`.
-    db.ensureTable();   # TODO: Make this skippable.
+    # Return built `db` (after setting up pogotbl.)
+    if not skipSetup:
+        db.ensureTable();
+    db.update({"_skippedSetup": skipSetup, "_ranSetup": not skipSetup});
     return db;
 
 @contextlib.contextmanager
-def connect (pgUrl):
+def connect (pgUrl, skipSetup=False):
     "Returns a context-managed `db`, bound to `pgUrl`.";
     con = psycopg2.connect(pgUrl);
     with con:
         cur = con.cursor(cursor_factory=psycopg2.extras.RealDictCursor);
         with cur:
-            db = bindConCur(con, cur);
+            db = bindConCur(con, cur, skipSetup);
             yield db;
     #TMP: try: con.close(); except: pass; assert con.closed;
     con.close();    # Close _OUTSIDE_ the `with con` block;
     assert con.closed;
     return None;
 
-def makeConnector (pgUrl):
+def makeConnector (pgUrl, skipSetup=False):
     "Returns a `db`-supplying decorator, bound to `pgUrl`.";
+    ref = dotsi.fy({"skip1st": skipSetup, "used1st": False});
     def dbConnector (fn):
         @functools.wraps(fn)
         def wrapper (*args, **kwargs):
-            with connect(pgUrl) as db:
+            if not ref.used1st:
+                shouldSkip = ref.skip1st;
+                ref.used1st = not ref.used1st;
+            else:
+                shouldSkip = True;
+            with connect(pgUrl, shouldSkip) as db:
                 return fn(db=db, *args, **kwargs);
         return wrapper;
     return dbConnector;
@@ -203,20 +231,26 @@ def makeConnector (pgUrl):
 def shellConnect (pgUrl):
     "Returns context-unmanaged `db`, for use in Python Shell.";
     db = dotsi.fy({});  # Start empty, maintain reference.
-    def reopen (msg="Connection re-opened. Call `.close()` to close."):
+    MSG_OPN = "Connection opened. Call `.close()` to close.";
+    MSG_CLS = "Connection committed & closed. Call `.reopen()` to resume.";
+    MSG_RPN = "Connection re-opened. Call `.close()` to close.";
+
+    def reopen (msg=MSG_RPN, skipSetup=True):
         con = psycopg2.connect(pgUrl);
         cur = con.cursor(cursor_factory=psycopg2.extras.RealDictCursor);
-        db.update(bindConCur(con, cur));
+        db.update(bindConCur(con, cur, skipSetup));
         if msg: print(msg);
     db.reopen = reopen;
-    def close (msg="Connection committed & closed. Call `.reopen()` to resume."):
+
+    def close (msg=MSG_CLS):
         db._cur.close();
         db._con.commit();
         db._con.close();
         if msg: print(msg);
     db.close = close;
+
     # Open (1st time) and return:
-    db.reopen("Connection opened. Call `.close()` to close.");
+    db.reopen(MSG_OPN, skipSetup=False);
     return db;
 
 # End ######################################################
