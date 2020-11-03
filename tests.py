@@ -76,12 +76,16 @@ userList = dotsi.fy([
 ]);
 postList = dotsi.fy([
     {"_id": "03", "type":"post", "authorId": "00",
+        "hits": {"organic": 10, "promoted": 10, "tags": ["x"]},
         "title": "Title X .. ", "body": "Body X .."},
     {"_id": "04", "type":"post", "authorId": "01",
+        "hits": {"organic": 20, "promoted": 20, "tags": ["y"]},
         "title": "Title Y .. ", "body": "Body Y .."},
     {"_id": "05", "type":"post", "authorId": "02",
+        "hits": {"organic": 30, "promoted": 30, "tags": ["z"]},
         "title": "Title Z .. ", "body": "Body Z .."},
     {"_id": "06", "type":"post", "authorId": "00",
+        "hits": {"organic": 40, "promoted": 40, "tags": ["a"]},
         "title": "Title A .. ", "body": "Body A .."},
 ]);
 commentList = dotsi.fy([
@@ -129,6 +133,48 @@ def test_finding__blogging_example (db):
     assert sortid(alicePosts) == [postList[0], postList[-1]]
     assert sortid(db.find({})) == userList + postList + commentList;
     # TODO: .findSql(), or .find(.., whereEtc, argsEtc)
+
+# Updating data: :::::::::::::::::::::::::::::::::::::::::::
+@dbful
+def test_updating_blogging_example (db):
+    # .replaceOne():
+    post = postList[0];
+    post.body += "-- EDITED";       # In-memory update
+    assert not db.findOne(post._id).body.endswith("-- EDITED");
+    db.replaceOne(postList[0]);     # Propagate to db.
+    assert db.findOne(post._id).body.endswith("-- EDITED");
+    # .incr():
+    post = postList[0];
+    assert post.hits.organic == 10;                         # Before
+    db.incr({"_id": post._id}, ["hits", "organic"], 1);     # At db, w/ list keyPath.
+    r = db.findOne(post._id);
+    assert db.findOne(post._id).hits.organic == 11;
+    freshPost = db.findOne(post._id);
+    assert freshPost.hits.organic == 11;
+    assert post.hits.organic == 10;                         # Stale
+    postList[0] = freshPost;                                # In-memory update
+    assert db.findOne(freshPost._id) == postList[0];
+    # .decr():
+    post = postList[0];
+    assert post.hits.promoted == 10;                        # Before
+    db.decr({"_id": post._id}, "hits.promoted", 1);         # At db, w/ dotted-str keyPath.
+    assert db.findOne(post._id).hits.promoted == 9;
+    freshPost = db.findOne(post._id);
+    assert freshPost.hits.promoted == 9;
+    assert post.hits.promoted == 10;                        # Stale
+    postList[0] = freshPost;                                # In-memory update
+    assert db.findOne(freshPost._id) == postList[0];
+    # .push():
+    post = postList[0];
+    assert post.hits.tags == ["x"];                         # Before
+    db.push({"_id": post._id}, ["hits", "tags"], "p");      # At db, w/ list keyPath.
+    assert db.findOne(post._id).hits.tags == ["x", "p"];
+    db.push({"_id": post._id}, "hits.tags", "q");           # At db, w/ dotted-str keyPath.
+    assert db.findOne(post._id).hits.tags == ["x", "p", "q"];
+    freshPost = db.findOne(post._id);
+    assert freshPost.hits.tags == "x p q".split();
+    assert post.hits.tags == ["x"];                        # Stale
+    postList[0] = freshPost;                                # In-memory update.
 
 # Deleting data: :::::::::::::::::::::::::::::::::::::::::::
 @dbful 

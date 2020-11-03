@@ -32,7 +32,12 @@ except ImportError as e:
     );
 import psycopg2.extras;
 
-__version__ = "0.0.2";  # Req'd by flit.
+__version__ = "0.0.3-preview";  # Req'd by flit.
+
+#TODO/Consider:
+# 1. Check/remove excessive dotsi.fy(.) calls.
+# 2. Remove param `limit` in favor of just `whereEtc`.
+
 mapli = lambda seq, fn: dotsi.List(map(fn, seq));
 
 # Good to know:
@@ -171,7 +176,10 @@ def bindConCur (con, cur, skipSetup=False):
     db.findOne = findOne;
     
     def incr (subdoc, keyPath, delta):
-        if type(subdoc) is str: subdoc = {"_id": subdoc};
+        if type(subdoc) is str:
+            subdoc = {"_id": subdoc};
+        if type(keyPath) is str:
+            keyPath = keyPath.split(".");
         stmt = "UPDATE pogotbl SET doc = jsonb_set(doc, %s, ((doc #> %s)::int + %s)::text::jsonb) WHERE doc @> %s;";
         args = [keyPath, keyPath,  delta,  json.dumps(subdoc)];
         execute(stmt, args);
@@ -185,7 +193,10 @@ def bindConCur (con, cur, skipSetup=False):
         "Push `newEl` after `arrPath` in documents matching `subdoc`."; #TODO:Better docstring
         # arrPath: path to array.
         # lastElPath: path to last element _in_ array. 
-        if type(subdoc) is str: subdoc = {"_id": subdoc};
+        if type(subdoc) is str:
+            subdoc = {"_id": subdoc};
+        if type(arrPath) is str:
+            arrPath = arrPath.split(".");
         lastElPath = arrPath + ["-1"];
         stmt = "UPDATE pogotbl SET doc = jsonb_insert(doc, %s, %s, true) WHERE doc @> %s;";
         args = [lastElPath, json.dumps(newEl), json.dumps(subdoc)];

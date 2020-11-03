@@ -9,7 +9,7 @@ PogoDB is installable via pip, following a two-step process:
 1. `pip install pogodb`
 2. `pip install psycopg2` ***OR*** `pip install psycopg2-binary`
 
-Since the `psycopg2`/`psycopg2-binary` split, instead of us forcing a dependency on either one, it makes more sense for you to install your preferred package. PogoDB should work with either. *Tip:*  If `pip install psycopg2` fails, try `pip install psycopg2-binary`.
+Since the `psycopg2`/`psycopg2-binary` split, instead of forcing a dependency on either one, it makes more sense for you to install your preferred package. PogoDB should work with either. *Tip:*  If `pip install psycopg2` fails, try `pip install psycopg2-binary`.
 
 Quickstart
 --------------
@@ -51,11 +51,11 @@ def yourLogic (db):
     db.insertOne({"_id": "baz", "value": "quax"})
     # etc. ...
 ```
-The decorator supplies the `db` parameter to the decorated function. The parameter is supplied by name, so it must be called `db`, not `myDb` or something else.
+The decorator supplies the `db` parameter to the decorated function. The parameter is supplied by name, so it must be called `db`, not `myDb` or something else. That is, `dbConnect` automatically passes `db` to `yourLogic`, on each call.
 
 **Parameter `skipSetup`:**  
-Both `pogodb.connect` and `pogodb.makeConnector` accept `skipSetup` as a parameter, which defaults to `False`. Thus, by default, PogoDB runs some setup-code upon each connection. 
-_After_ your first interaction through PogoDB, to _avoid_ unnecessary setup, passing **`skipSetup=True`** is recommended.
+Both `pogodb.connect` and `pogodb.makeConnector` accept `skipSetup` as a parameter, which defaults to `False`. By default, PogoDB runs some setup-code upon each connection. 
+_After_ your first interaction with the the database through  PogoDB, to _avoid_ unnecessary setup, pass**`skipSetup=True`**.
 
 Inserting Data
 ------------------
@@ -98,7 +98,7 @@ taskD = aliceTasks[1];
 print(taskD.author, "-", taskD.text)
 # Output: Alice - DD
 ```
-*Note:* If no matching document is found, `.findOne(.)` returns `None` while `.find(.)` returns an empty list.
+Note: If no matching document is found, `.findOne(.)` returns `None` while `.find(.)` returns an empty list.
 
 Updating Data
 ------------------
@@ -112,12 +112,12 @@ print([db.findOne(taskA._id).text, taskA.x])
 # Output: ['New AA', {'y': 10, 'z': 20}]
 
 # Increment within document:
-db.incr({"_id": "a"}, ["x", "y"], 1) # Incr x.y by 1
+db.incr({"_id": "a"}, "x.y", 1) # Incr x.y by 1
 print(db.findOne("a").x)
 # Output: {'y': 11, 'z': 20}
 
 # Decrement:
-db.decr({"_id": "a"}, ["x", "z"], 1) # Decr x.z by 1
+db.decr({"_id": "a"}, "x.z", 1) # Decr x.z by 1
 print(db.findOne("a").x)
 # Output: {'y': 11, 'z': 19}
 ```
@@ -137,22 +137,16 @@ Quick Plug
 --------------
 PogoDB built and maintained by the folks at [Polydojo, Inc.](https://www.polydojo.com/), led by Sumukh Barve. If your team is looking for a simple project management tool, please check out our latest product: [BoardBell.com](https://www.boardbell.com/).
 
-Under The Hood
----------------------
-Under the hood, PogoDB creates a single table named `pogo_tbl` with a single `JSONB` column named `doc` (for document).
-
-**TODO:** Write documentation regarding lower-level functions such as `db._findSql(.)` and `db._execute(.)`. Also document the `whereEtc` parameter accepted by `db.find(.)` and `db.findOne(.)`.
-
 Type Identifiers
 -------------------
 
-PogoDB doesn't include buckets, collections or other such concepts for **logically grouping** different types of documents. But you can *(and should)* use a key for differentiating objects of various types.
+PogoDB doesn't include buckets, collections or other such concepts for **logically grouping** different types of objects. But you can use a key for differentiating objects of various types.
 
 **Convention:**  
-Keeping things simple, we recommend using the `"type"` key for indicating the type of the object.
+Keeping things simple, we recommend using the `"type"` key for indicating the type of a document/object.
 
 **Example:**  
-In a blogging app, you'll have to deal with users, posts, comments and other types of objects. 
+In a blogging app, you'll have to deal with users, posts, comments and other types of object. 
 
 ```py
 # Insert users:
@@ -219,6 +213,12 @@ print(untyped_getPostById("00")) # Weird result.
 ```
 
 In the above example, `"00"` corresponds to Alice's `"user"` object. It's not a `"post"`. Yet `untyped_getPostById(.)` (incorrectly) returns it because it is type-blind.
+
+Under The Hood
+---------------------
+Under the hood, PogoDB creates a single table named `pogotbl` with a single `JSONB` column named `doc` (for document).
+
+**TODO:** Write documentation regarding lower-level functions such as `db._findSql(.)` and `db._execute(.)`. Also document the `whereEtc` parameter accepted by `db.find(.)` and `db.findOne(.)`.
 
 Licensing
 ------------
