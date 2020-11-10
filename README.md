@@ -1,19 +1,19 @@
 PogoDB
 =======
 
-Simple NoSQL wrapper for Postgres' JSONB type. 
+Simple NoSQL wrapper around Postgres' JSONB type.
 
 Installation
 --------------
-PogoDB is installable via pip, following a two-step process:
+PogoDB is installable via pip, following a *two-step* process:
 1. `pip install pogodb`
 2. `pip install psycopg2` ***OR*** `pip install psycopg2-binary`
 
-Since the `psycopg2`/`psycopg2-binary` split, instead of forcing a dependency on either one, it makes more sense for you to install your preferred package. PogoDB should work with either. *Tip:*  If `pip install psycopg2` fails, try `pip install psycopg2-binary`.
+Since the `psycopg2`/`psycopg2-binary` split, instead of forcing a dependency on either one, the choice is left to you. PogoDB should work with either. *Tip:*  If `pip install psycopg2` fails, try `pip install psycopg2-binary`.
 
 Quickstart
 --------------
-To connect from a Python Shell, use `pogodb.shellConnect()`.
+To connect from a Python Shell, use `pogodb.shellConnect(.)`.
 ```py
 >>> import pogodb
 >>> db = pogodb.shellConnect("postgres://..dsn..")
@@ -51,11 +51,15 @@ def yourLogic (db):
     db.insertOne({"_id": "baz", "value": "quax"})
     # etc. ...
 ```
-The decorator supplies the `db` parameter to the decorated function. The parameter is supplied by name, so it must be called `db`, not `myDb` or something else. That is, `dbConnect` automatically passes `db` to `yourLogic`, on each call.
+The decorator supplies the `db` parameter to the decorated function. The parameter is supplied by name, so it must be called `db`, not `myDb` or something else. That is, `@dbConnect` automatically passes `db` to `yourLogic`, on each call.
 
 **Parameter `skipSetup`:**  
-Both `pogodb.connect` and `pogodb.makeConnector` accept `skipSetup` as a parameter, which defaults to `False`. By default, PogoDB runs some setup-code upon each connection. 
-_After_ your first interaction with the the database through  PogoDB, to _avoid_ unnecessary setup, pass**`skipSetup=True`**.
+Both `pogodb.connect(.)` and `pogodb.makeConnector(.)` accept `skipSetup` as a parameter, which defaults to `False`. By default, PogoDB runs some setup-code upon each connection.
+
+_After_ your first interaction with the the database through  PogoDB, to _avoid_ unnecessary setup, pass `skipSetup=True`.
+
+**Parameter `verbose`:**
+Each connection method accepts `verbose` as a parameter, defaulting to `False`. If `True`, details regarding connecting to Postgres and executing SQL are printed using `print(.)`.
 
 Inserting Data
 ------------------
@@ -214,11 +218,159 @@ print(untyped_getPostById("00")) # Weird result.
 
 In the above example, `"00"` corresponds to Alice's `"user"` object. It's not a `"post"`. Yet `untyped_getPostById(.)` (incorrectly) returns it because it is type-blind.
 
+SQL Familiarity
+-------------------
+
+From this point, the documentation assumes basic familiarity with SQL and Postgres' JSONB type. If you aren't familiar with these, you may safely skip most of the documentation below. However, please note that such familiarity would be required for running advanced, fine-grained queries.
+
 Under The Hood
 ---------------------
 Under the hood, PogoDB creates a single table named `pogotbl` with a single `JSONB` column named `doc` (for document).
 
-**TODO:** Write documentation regarding lower-level functions such as `db._findSql(.)` and `db._execute(.)`. Also document the `whereEtc` parameter accepted by `db.find(.)` and `db.findOne(.)`.
+When you call `db.find(.)`, PogoDB uses Postgres' `@>` to find and fetch the relevant documents. For example, calling `db.find({"type": "post"})` will result in the following underlying SQL query:
+```sql
+SELECT doc FROM pogotbl WHERE doc @> '{"type": "post"}';
+```
+The above SQL will produce a list of records of type`psycopg2.extras.RealDictCursor`, each with just one column: `"doc"`. That is, the list of records is of the form:
+```json
+[   {"doc": {"_id": "1..", "type": "post", ...}},
+    {"doc": {"_id": "2..", "type": "post", ...}},
+    ...
+]
+```
+After executing the SQL, `db.find(.)` plucks the `"doc"` column from each record and returns the resultant list, which is (as expected,) of the form:
+```json
+[   {"_id": "1..", "type": "post", ...},
+    {"_id": "2..", "type": "post", ...},
+    ...
+]
+```
+Additionally, `db.find(.)` ensures that each returned document is a dot-accessible dictionary, thanks to [Dotsi](https://github.com/polydojo/dotsi). That is, you can use dot-notation (like `post._id`) in addition to square-bracket notation (like `post["_id"]`).
+
+Custom `WHERE` Clause
+------------------------------------
+
+Let's say you've stored the following exam-results using PogoDB:
+```json
+[   {"_id":"1", "studentId":"X", "subjectId":"M", "score": 70},
+    {"_id":"2", "studentId":"Y", "subjectId":"M", "score": 75},
+    {"_id":"3", "studentId":"Z", "subjectId":"M", "score": 80},
+    {"_id":"4", "studentId":"X", "subjectId":"N", "score": 85},
+    {"_id":"5", "studentId":"Y", "subjectId":"N", "score": 90},
+    {"_id":"6", "studentId":"Z", "subjectId":"N", "score": 95},
+]
+```
+
+To find *all* results for *Subject M*, we'd write `db.find({"subjectId": "M"})`, which'd result in the underlying SQL query:
+```sql
+SELECT doc FROM pogotbl WHERE doc @> '{"subjectId": "M"}';
+```
+
+But how about retrieving ***only those*** results for *Subject M*, where the *score* is `75` or higher? In raw SQL, we could've written:
+```sql
+SELECT doc FROM pogotbl
+  WHERE doc @> '{"subjectId": "M"}'
+    AND (doc->>'score')::int >= 75;
+```
+
+With regard to the two SQL queries above, note that the `WHERE` clause additionally includes `AND (doc->>'score')::int >= 75`. You can pass this extra bit to `db.find(.)` using the `whereEtc` parameter:
+```py
+db.find({"subjectId": "M"},
+    whereEtc="AND (doc->>'score')::int >= 75"
+)
+```
+
+In fact, `db.find(.)` is very flexible. Its full signature is documented below.
+
+Full `db.find(.)` Signature
+----------------------------------
+
+`db.find(.)` accepts 4 parameters:
+1. `subdoc` (required): The sub-document to match against.
+2. `whereEtc` (optional): Anything that should go ***after*** PogoDB's  default SQL `WHERE` clause.
+3. `argsEtc` (optional): Tuple (or list) for placeholder-substitution against `whereEtc`.
+4. `limit` (optional): The maximum number of results desired. (Either use this param or add the SQL `LIMIT` clause in `whereEtc`; don't do both.)
+
+**Note:** `db.findOne(.)` has the same signature as `db.find(.)`, except of course, that it doesn't have a `limit` parameter (and neither does it expect to see the `LIMIT` clause in `whereEtc`).
+
+`ORDER BY`, `LIMIT`  Etc.
+------------------------------
+Everything in `whereEtc` is placed directly in the executed SQL. (Of course, placeholder-substitution is performed carefully. More on this later.) Thus, by using `whereEtc`, not only can you specify additional matching conditions (like `AND (doc->>'score')::int >= 75`), but you can also include other SQL clauses such as `ORDER BY`, `LIMIT` etc.
+
+**SORTING:**
+Continuing the above exam-results example, to find results for *Subject M* sorted by *Student IDs* (lowest to highest):
+```py
+db.find({"subjectId": "M"},
+    whereEtc="ORDER BY doc->>'studentId' ASC"
+)
+```
+The underlying SQL executed by PogoDB will be:
+```sql
+SELECT doc FROM pogotbl WHERE doc @> '{"subjectId": "M"}'
+    ORDER BY doc->>'studentId' ASC;
+```
+
+**LIMITING:**
+To find the *top 2* results for *Subject M*, we can use:
+```py
+db.find({"subjectId": "M"},
+    whereEtc="ORDER BY (doc->>'score')::int DESC",
+    limit=2
+)
+```
+Or equivalently:
+```py
+db.find({"subjectId": "M"},
+    whereEtc="ORDER BY (doc->>'score')::int DESC LIMIT 2"
+)
+```
+In either case, the underlying SQL executed by PogoDB will be:
+```sql
+SELECT doc FROM pogotbl WHERE doc @> '{"subjectId": "M"}'
+    ORDER BY (doc->>'score')::int DESC
+    LIMIT 2;
+```
+
+**PLACEHOLDERS:**
+Let's write a function for finding the top N (`n`) results for a given subject (`subjectId`), at or above a given threshold (`minScore`).
+```py
+import pogodb;
+dbConnect = pogodb.makeConnector("postgres://..dsn..");
+
+@dbConnect
+def getTopN (n, subjectId, minScore, db):
+  return db.find({"subjectId": subjectId},
+    whereEtc="AND (doc->>'score')::int >= %s ORDER BY (doc->>'score')::int DESC",
+    argsEtc=[minScore],
+    limit=n
+  );
+```
+Alternatively:
+```py
+@dbConnect
+def getTopN (n, subjectId, minScore, db):
+  return db.find({"subjectId": subjectId},
+    whereEtc="AND (doc->>'score')::int >= %s ORDER BY (doc->>'score')::int DESC LIMIT %s",
+    argsEtc=[minScore, n],
+  );
+```
+Note: Placeholder substitution is deferred to [Psycopg's `cursor.execute(.)` method](https://www.psycopg.org/docs/cursor.html#cursor.execute), which should prevent [SQL-injection](https://owasp.org/www-community/attacks/SQL_Injection).
+
+**Warning:** Do **NOT** use string concatenation (i.e. `+`, `str.join(.)`, etc.) or string interpolation (i.e. `%`, `str.format(.)`,  etc.) along with `whereEtc`. Pass `argsEtc` instead.
+
+
+Executing Raw SQL
+------------------------
+If you'd like to execute raw SQL, we recommend using [Psycopg](https://www.psycopg.org/) directly. We recommend *against* using `db._execute(.)`.
+
+Typically, `db._execute(.)` should only be relevant to PogoDB's maintainers. It accepts three parameters:
+1. `stmt` (required): The SQL statement to be executed.
+2. `args` (optional): Tuple (or list) for `%s` placeholder substitution.
+3. `fetch` (optional): Either `None` (optional), `"one"` or `"all"`.
+
+Parameters `stmt` and `args` are passed directly to Psycopg's `cursor.execute(.)` method. Based on `fetch`, none, one or all records are fetched.
+
+A close cousin to `db._execute(.)` is `db._findSql(.)`, which is useful for executing `SELECT` queries. It only accepts `stmt` (required) and `args` (optional), as described above. It fetches all matching results, plucks the `doc` column, ensures dot-accessibility of dictionary objects, and returns the result.
 
 Licensing
 ------------

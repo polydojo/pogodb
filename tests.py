@@ -4,12 +4,14 @@ import pprint;
 import pogodb;
 import dotsi;
 
+VERBOSE = False; # True/False;
+
 pgUrl = json.load(open("tests.py.env.json"))["DATABASE_URL"];
-dbful = pogodb.makeConnector(pgUrl);
+dbful = pogodb.makeConnector(pgUrl, verbose=VERBOSE);
 
 # Test shellConnect:
 def test_shellConect ():
-    db = pogodb.shellConnect(pgUrl);
+    db = pogodb.shellConnect(pgUrl, verbose=VERBOSE);
     assert db._ranSetup is True;
     db.close();
     db.reopen();
@@ -184,6 +186,10 @@ def test_deleting__blogging_example (db):
         #r = db.find(comment._id); print("r = ", r);
         assert db.findOne(comment._id) is None;
     assert sortid(db.find({})) == userList + postList;
+    for doc in userList + postList:
+        db.deleteOne(doc._id);
+        assert db.findOne(doc._id) is None;
+    assert db.find({}) == [];
 
 
 
@@ -198,6 +204,8 @@ if __name__ == "__main__":
             print("\nRunning %s() ..." % name)
             val();
             print("Passed.")
+            if VERBOSE:
+                print("\n" + ("=" * 80) + "\n");
     print("\nGreat! All tests passed.\n");
 else:
     getdb = lambda: pogodb.shellConnect(pgUrl);
