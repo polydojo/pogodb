@@ -39,7 +39,7 @@ except ImportError as e:
     );
 import psycopg2.extras;
 
-__version__ = "0.0.3";  # Req'd by flit.
+__version__ = "0.0.4-preview";  # Req'd by flit.
 
 mapli = lambda seq, fn: dotsi.List(map(fn, seq));
 

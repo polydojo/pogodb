@@ -7,7 +7,7 @@ Installation
 --------------
 PogoDB is installable via pip, following a *two-step* process:
 1. `pip install pogodb`
-2. `pip install psycopg2` ***OR*** `pip install psycopg2-binary`
+2. `pip install psycopg2` *OR* `pip install psycopg2-binary`
 
 Since the `psycopg2`/`psycopg2-binary` split, instead of forcing a dependency on either one, the choice is left to you. PogoDB should work with either. *Tip:*  If `pip install psycopg2` fails, try `pip install psycopg2-binary`.
 
@@ -30,7 +30,7 @@ Connection committed & closed. Call `.reopen()` to resume.
 Connecting Properly
 -------------------------
 
-**Context Manager:**
+#### Context Manager:
 
 Using `with pogodb.connect(.) as db` is a better way to connect. On exiting the `with` block, the transaction is auto-committed and the connection is auto-closed.
 ```py
@@ -40,7 +40,8 @@ with pogodb.connect("postgres://..dsn..") as db:
     # etc. ...
 ```
 
-**Connection Decorator:**
+#### Connection Decorator:
+
 For frequently connecting to the same database, consider setting up a connection decorator as follows:
 ```py
 import pogodb
@@ -53,12 +54,12 @@ def yourLogic (db):
 ```
 The decorator supplies the `db` parameter to the decorated function. The parameter is supplied by name, so it must be called `db`, not `myDb` or something else. That is, `@dbConnect` automatically passes `db` to `yourLogic`, on each call.
 
-**Parameter `skipSetup`:**  
+#### Parameter `skipSetup`:
 Both `pogodb.connect(.)` and `pogodb.makeConnector(.)` accept `skipSetup` as a parameter, which defaults to `False`. By default, PogoDB runs some setup-code upon each connection.
 
 _After_ your first interaction with the the database through  PogoDB, to _avoid_ unnecessary setup, pass `skipSetup=True`.
 
-**Parameter `verbose`:**
+#### Parameter `verbose`:
 Each connection method accepts `verbose` as a parameter, defaulting to `False`. If `True`, details regarding connecting to Postgres and executing SQL are printed using `print(.)`.
 
 Inserting Data
@@ -76,7 +77,7 @@ db.insertMany([
 ]);
 ```
 
-**Document Model:**  
+#### Document Model:
 Each document must:
 - be a JSON-serializable `dict` or dict-like object, *and*
 - have a *unique string* value corresponding to the `"_id"` key.
@@ -146,10 +147,10 @@ Type Identifiers
 
 PogoDB doesn't include buckets, collections or other such concepts for **logically grouping** different types of objects. But you can use a key for differentiating objects of various types.
 
-**Convention:**  
+#### Convention:
 Keeping things simple, we recommend using the `"type"` key for indicating the type of a document/object.
 
-**Example:**  
+#### Example:
 In a blogging app, you'll have to deal with users, posts, comments and other types of object. 
 
 ```py
@@ -233,16 +234,16 @@ SELECT doc FROM pogotbl WHERE doc @> '{"type": "post"}';
 ```
 The above SQL will produce a list of records of type`psycopg2.extras.RealDictCursor`, each with just one column: `"doc"`. That is, the list of records is of the form:
 ```json
-[   {"doc": {"_id": "1..", "type": "post", ...}},
-    {"doc": {"_id": "2..", "type": "post", ...}},
-    ...
+[   {"doc": {"_id": "1..", "type": "post", "etc": "..."}},
+    {"doc": {"_id": "2..", "type": "post", "etc": "..."}},
+    "etc. ..."
 ]
 ```
 After executing the SQL, `db.find(.)` plucks the `"doc"` column from each record and returns the resultant list, which is (as expected,) of the form:
 ```json
-[   {"_id": "1..", "type": "post", ...},
-    {"_id": "2..", "type": "post", ...},
-    ...
+[   {"_id": "1..", "type": "post", "etc": "..."},
+    {"_id": "2..", "type": "post", "etc": "..."},
+    "etc. ..."
 ]
 ```
 Additionally, `db.find(.)` ensures that each returned document is a dot-accessible dictionary, thanks to [Dotsi](https://github.com/polydojo/dotsi). That is, you can use dot-notation (like `post._id`) in addition to square-bracket notation (like `post["_id"]`).
@@ -293,11 +294,11 @@ Full `db.find(.)` Signature
 
 **Note:** `db.findOne(.)` has the same signature as `db.find(.)`, except of course, that it doesn't have a `limit` parameter (and neither does it expect to see the `LIMIT` clause in `whereEtc`).
 
-`ORDER BY`, `LIMIT`  Etc.
-------------------------------
+Clauses `ORDER BY`, `LIMIT`  etc.
+-----------------------------------------
 Everything in `whereEtc` is placed directly in the executed SQL. (Of course, placeholder-substitution is performed carefully. More on this later.) Thus, by using `whereEtc`, not only can you specify additional matching conditions (like `AND (doc->>'score')::int >= 75`), but you can also include other SQL clauses such as `ORDER BY`, `LIMIT` etc.
 
-**SORTING:**
+### Sorting:
 Continuing the above exam-results example, to find results for *Subject M* sorted by *Student IDs* (lowest to highest):
 ```py
 db.find({"subjectId": "M"},
@@ -310,7 +311,7 @@ SELECT doc FROM pogotbl WHERE doc @> '{"subjectId": "M"}'
     ORDER BY doc->>'studentId' ASC;
 ```
 
-**LIMITING:**
+### Limiting:
 To find the *top 2* results for *Subject M*, we can use:
 ```py
 db.find({"subjectId": "M"},
@@ -331,7 +332,7 @@ SELECT doc FROM pogotbl WHERE doc @> '{"subjectId": "M"}'
     LIMIT 2;
 ```
 
-**PLACEHOLDERS:**
+### Placeholders:
 Let's write a function for finding the top N (`n`) results for a given subject (`subjectId`), at or above a given threshold (`minScore`).
 ```py
 import pogodb;
@@ -356,7 +357,7 @@ def getTopN (n, subjectId, minScore, db):
 ```
 Note: Placeholder substitution is deferred to [Psycopg's `cursor.execute(.)` method](https://www.psycopg.org/docs/cursor.html#cursor.execute), which should prevent [SQL-injection](https://owasp.org/www-community/attacks/SQL_Injection).
 
-**Warning:** Do **NOT** use string concatenation (i.e. `+`, `str.join(.)`, etc.) or string interpolation (i.e. `%`, `str.format(.)`,  etc.) along with `whereEtc`. Pass `argsEtc` instead.
+**WARNING:** Do **NOT** use string concatenation (i.e. `+`, `str.join(.)`, etc.) or string interpolation (i.e. `%`, `str.format(.)`,  etc.) along with `whereEtc`. Pass `argsEtc` instead.
 
 
 Executing Raw SQL
